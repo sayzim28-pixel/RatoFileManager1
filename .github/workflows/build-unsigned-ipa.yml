@@ -1,0 +1,46 @@
+name: Build unsigned IPA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build for iPhone (ARM64)
+    runs-on: macos-15
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Build unsigned archive
+        run: |
+          xcodebuild \
+            -project RatoFileManager.xcodeproj \
+            -scheme RatoFileManager \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath "$PWD/build/RatoFileManager.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            archive
+
+      - name: Package IPA
+        run: |
+          set -euo pipefail
+          app_path="$PWD/build/RatoFileManager.xcarchive/Products/Applications/RatoFileManager.app"
+          test -d "$app_path"
+          mkdir -p Payload
+          cp -R "$app_path" Payload/RatoFileManager.app
+          ditto -c -k --sequesterRsrc --keepParent Payload RatoFileManager-unsigned.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RatoFileManager-unsigned-ipa
+          path: RatoFileManager-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 7
